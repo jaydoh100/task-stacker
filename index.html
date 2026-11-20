@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ea">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Task Stacker">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Task Stacker</title>
+<style>
+:root{--bg:#f4f1ea;--ink:#1d1b18;--muted:#8a857b;--row:#e8e3d8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+.app{max-width:480px;margin:0 auto;height:100%;height:100dvh;display:flex;flex-direction:column}
+header{padding:calc(18px + env(safe-area-inset-top)) 18px 4px}
+h1{font-size:21px;margin:0;letter-spacing:-.02em}
+.hint{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+#board{flex:1;overflow-y:auto;padding:12px 14px 130px;-webkit-overflow-scrolling:touch}
+.row{position:relative;display:flex;gap:6px;height:64px;margin-bottom:10px;padding:4px;border-radius:14px;background:var(--row)}
+.block{position:relative;flex:1 1 0;min-width:0;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  padding:0 8px;font-size:14px;font-weight:600;text-align:center;touch-action:pan-y;overflow:hidden;
+  box-shadow:0 1px 0 rgba(0,0,0,.08);cursor:grab}
+.block .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.block.ph{background:rgba(255,255,255,.45)!important;border:2px dashed rgba(0,0,0,.28);box-shadow:none}
+.block.ph .t{visibility:hidden}
+.empty{color:var(--muted);text-align:center;margin-top:30vh;font-size:14px}
+.ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  padding:0 8px;font-size:14px;font-weight:600;box-shadow:0 14px 30px rgba(0,0,0,.28);overflow:hidden;white-space:nowrap;
+  text-overflow:ellipsis}
+.ghost.chip{opacity:.72;font-size:12px;border-radius:20px;
+  transition:width .15s ease,height .15s ease,opacity .15s ease,border-radius .15s ease}
+footer{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:14px 0 calc(22px + env(safe-area-inset-bottom));pointer-events:none;
+  background:linear-gradient(to top,var(--bg) 55%,rgba(244,241,234,0))}
+#add{pointer-events:auto;width:64px;height:64px;border-radius:50%;border:none;background:var(--ink);color:#fff;font-size:34px;line-height:1;
+  box-shadow:0 6px 18px rgba(0,0,0,.25)}
+#add:active{transform:scale(.94)}
+.edge{position:fixed;top:0;bottom:0;padding-top:env(safe-area-inset-top);width:46px;z-index:40;pointer-events:none;opacity:0;transition:opacity .15s;
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px}
+.edge.l{left:0;background:linear-gradient(to right,rgba(214,48,40,.55),rgba(214,48,40,0))}
+.edge.r{right:0;background:linear-gradient(to left,rgba(214,48,40,.55),rgba(214,48,40,0))}
+body.dragging .edge{opacity:.35}
+body.dragging .edge.hot{opacity:1}
+.ghost.del{background:#d63028!important;color:#fff;opacity:.9}
+.toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;z-index:60;background:var(--ink);color:#fff;
+  border-radius:24px;padding:10px 10px 10px 18px;font-size:14px;display:flex;align-items:center;gap:12px;
+  transition:opacity .2s,transform .2s;pointer-events:none;white-space:nowrap}
+.toast.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+.toast button{border:none;background:#fff;color:var(--ink);font-weight:700;font-size:14px;border-radius:16px;padding:7px 12px}
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100;display:none;align-items:flex-end;justify-content:center}
+.sheet-bg.on{display:flex}
+.sheet{width:100%;max-width:480px;background:#fff;border-radius:20px 20px 0 0;padding:18px 16px 26px}
+.sheet h2{font-size:16px;margin:0 0 12px}
+.sheet input{width:100%;font-size:17px;padding:13px 14px;border:1.5px solid #ddd6c8;border-radius:12px;outline:none;-webkit-user-select:text;user-select:text}
+.sheet input:focus{border-color:var(--ink)}
+.btns{display:flex;gap:8px;margin-top:12px}
+.btns button{flex:1;font-size:16px;font-weight:600;padding:14px;border-radius:12px;border:none;background:#eee9df;color:var(--ink)}
+.btns .primary{background:var(--ink);color:#fff}
+.btns .danger{flex:0 0 auto;background:#fbe3e1;color:#b3261e}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Task Stacker</h1>
+    <div class="hint">블록을 옆으로 밀거나 살짝 길게 눌러서 옮기기 · 라인 사이에 놓으면 새 라인 · 화면 양 끝으로 던지면 삭제 · 탭하면 이름 수정</div>
+  </header>
+  <div id="board"></div>
+</div>
+<div class="edge l" id="edgeL">🗑</div><div class="edge r" id="edgeR">🗑</div>
+<div class="toast" id="toast"><span>블록 삭제됨</span><button id="undoBtn">되돌리기</button></div>
+<footer><button id="add" aria-label="블록 추가">+</button></footer>
+
+<div class="sheet-bg" id="sheetBg">
+  <form class="sheet" id="sheet">
+    <h2 id="sheetTitle">새 블록</h2>
+    <input id="sheetInput" maxlength="40" placeholder="할 일 이름" autocomplete="off">
+    <div class="btns">
+      <button type="button" class="danger" id="delBtn">삭제</button>
+      <button type="button" id="cancelBtn">취소</button>
+      <button type="submit" class="primary">저장</button>
+    </div>
+  </form>
+</div>
+
+<script>
+const COLORS=['#f6c9a8','#bfe0c3','#c7d7f5','#f3d38b','#e3c4ee','#f5b8b8','#b9e3e6','#d9d2a6'];
+const MAX_PER_LINE=6, KEY='task-stacker-proto-v1';
+const board=document.getElementById('board');
+let lines=[], seq=0;
+
+function mk(text){seq++;return {id:seq,text,c:(seq-1)%COLORS.length}}
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.lines)){lines=s.lines;seq=s.seq||0;return}}catch(e){}
+  lines=[[mk('메일 답장'),mk('장보기')],[mk('병원 예약')],[mk('유튜브 편집'),mk('게임 빌드'),mk('운동')],[mk('세금 서류')]];
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({lines,seq}))}catch(e){}}
+function buzz(ms){try{navigator.vibrate&&navigator.vibrate(ms)}catch(e){}}
+
+/* ---------- drag state ---------- */
+let pend=null;   // pointer down, not yet dragging
+let drag=null;   // {block, target, ghost, offX, offY, x, y}
+
+function baseLines(){return lines.map(l=>l.filter(b=>b.id!==drag.block.id)).filter(l=>l.length)}
+function buildView(){
+  if(!drag) return {view:lines,meta:lines.map((_,i)=>i)};
+  const base=baseLines(), view=base.map(l=>l.slice()), meta=base.map((_,i)=>i);
+  const ph=Object.assign({},drag.block,{ph:true}), t=drag.target;
+  if(t.type==='into') view[t.r].splice(t.i,0,ph);
+  else if(t.type==='new') {view.splice(t.r,0,[ph]); meta.splice(t.r,0,'new')}
+  // t.type==='del': no placeholder
+  return {view,meta};
+}
+
+/* ---------- render with FLIP so blocks slide/shrink ---------- */
+function render(){
+  const prev=new Map();
+  board.querySelectorAll('.block').forEach(el=>prev.set(el.dataset.id,el.getBoundingClientRect()));
+  const {view,meta}=buildView();
+  board.innerHTML='';
+  if(!view.length){board.innerHTML='<div class="empty">아래 + 버튼으로 블록을 추가해 보세요</div>';return}
+  view.forEach((row,ri)=>{
+    const r=document.createElement('div');r.className='row';r.dataset.base=meta[ri];
+    row.forEach(b=>{
+      const el=document.createElement('div');
+      el.className='block'+(b.ph?' ph':'');el.dataset.id=b.id;el.style.background=COLORS[b.c];
+      const t=document.createElement('span');t.className='t';t.textContent=b.text;el.appendChild(t);
+      r.appendChild(el);
+    });
+    board.appendChild(r);
+  });
+  board.querySelectorAll('.block').forEach(el=>{
+    const p=prev.get(el.dataset.id);if(!p)return;
+    const n=el.getBoundingClientRect();
+    const dx=p.left-n.left, dy=p.top-n.top, sx=p.width/n.width;
+    if(Math.abs(dx)<1&&Math.abs(dy)<1&&Math.abs(sx-1)<.01)return;
+    el.style.transformOrigin='0 0';el.style.transition='none';
+    el.style.transform=`translate(${dx}px,${dy}px) scaleX(${sx})`;
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      el.style.transition='transform .2s cubic-bezier(.2,.8,.2,1)';el.style.transform='';
+    }));
+  });
+}
+
+/* ---------- where would the block land? ---------- */
+const EDGE=22;
+function hit(x,y){
+  const br=board.getBoundingClientRect();
+  if(x<br.left+EDGE||x>br.right-EDGE) return {type:'del',side:x<br.left+EDGE?'l':'r'};
+  const rows=[...board.querySelectorAll('.row')], base=baseLines();
+  if(!rows.length) return {type:'new',r:0};
+  for(const el of rows){
+    const rc=el.getBoundingClientRect();
+    if(y>rc.bottom+5) continue;
+    if(el.dataset.base==='new') return drag.target;           // already hovering the new-line slot
+    const r=+el.dataset.base, band=rc.height*0.24;
+    if(y<rc.top+band) return {type:'new',r};                  // gap above → new line
+    if(y>rc.bottom-band) return {type:'new',r:r+1};           // gap below → new line
+    if(base[r].length>=MAX_PER_LINE) return drag.target;      // line is full
+    let i=0;
+    el.querySelectorAll('.block:not(.ph)').forEach(b=>{if(x>rc.left+b.offsetLeft+b.offsetWidth/2)i++});
+    return {type:'into',r,i};
+  }
+  return {type:'new',r:base.length};
+}
+function updateTarget(){
+  // aim with the chip's center (what the eye follows), not the hidden fingertip
+  const t=hit(drag.x-drag.offX+drag.gw/2, drag.y-drag.offY+drag.gh/2);
+  if(t.type!==drag.target.type||t.r!==drag.target.r||t.i!==drag.target.i||t.side!==drag.target.side){
+    drag.target=t;buzz(t.type==='del'?25:8);render();
+  }
+  const d=t.type==='del';
+  drag.ghost.classList.toggle('del',d);
+  document.getElementById('edgeL').classList.toggle('hot',d&&t.side==='l');
+  document.getElementById('edgeR').classList.toggle('hot',d&&t.side==='r');
+}
+
+/* ---------- gestures ---------- */
+function findBlock(id){for(let r=0;r<lines.length;r++){const i=lines[r].findIndex(b=>b.id===id);if(i>=0)return {r,i}}return null}
+
+function startDrag(){
+  const p=pend;pend=null;clearTimeout(p.timer);
+  const pos=findBlock(p.id);if(!pos)return;
+  const block=lines[pos.r][pos.i], rc=p.el.getBoundingClientRect();
+  let br=0;for(let k=0;k<pos.r;k++)br++;               // rows before stay (none become empty)
+  const target=lines[pos.r].length>1?{type:'into',r:br,i:pos.i}:{type:'new',r:br};
+  // Ghost starts at the block's real size, then shrinks to a compact chip that floats
+  // just above the thumb, so the rows (and the dashed landing slot) stay visible.
+  const g=document.createElement('div');g.className='ghost';
+  g.style.width=rc.width+'px';g.style.height=rc.height+'px';g.style.background=COLORS[block.c];
+  g.textContent=block.text;document.body.appendChild(g);
+  const W=Math.min(rc.width,96), H=40, lift=p.mouse?-H/2:28;   // touch: chip sits above the finger
+  drag={block,target,ghost:g,offX:p.x-rc.left,offY:p.y-rc.top,x:p.x,y:p.y,gw:rc.width,gh:rc.height};
+  document.body.classList.add('dragging');
+  moveGhost();
+  requestAnimationFrame(()=>{
+    g.classList.add('chip');
+    g.style.width=W+'px';g.style.height=H+'px';
+    if(drag){drag.offX=W/2;drag.offY=H+lift;drag.gw=W;drag.gh=H;moveGhost();updateTarget()}
+  });
+  buzz(15);render();autoScroll();
+}
+function moveGhost(){drag.ghost.style.transform=`translate(${drag.x-drag.offX}px,${drag.y-drag.offY}px) scale(1.06) rotate(-1.5deg)`}
+let undoSnap=null, toastTimer=null;
+function drop(){
+  if(!drag)return;
+  document.body.classList.remove('dragging');
+  document.querySelectorAll('.edge').forEach(e=>e.classList.remove('hot'));
+  if(drag.target.type==='del'){
+    undoSnap={lines:JSON.parse(JSON.stringify(lines)),seq};
+    const g=drag.ghost, dir=drag.target.side==='l'?-1:1;
+    g.style.transition='transform .22s ease-in,opacity .22s ease-in';
+    g.style.transform=`translate(${drag.x-drag.offX+dir*160}px,${drag.y-drag.offY}px) scale(.6) rotate(${dir*20}deg)`;
+    g.style.opacity='0';setTimeout(()=>g.remove(),240);
+    lines=baseLines();drag=null;save();render();buzz(30);showToast();
+    return;
+  }
+  const {view}=buildView();
+  lines=view.map(l=>l.map(b=>{if(b.ph){const c=Object.assign({},b);delete c.ph;return c}return b}));
+  drag.ghost.remove();drag=null;save();render();buzz(10);
+}
+function autoScroll(){
+  if(!drag)return;
+  const rc=board.getBoundingClientRect(), edge=60;
+  let v=0;
+  const cy=drag.y-drag.offY+drag.gh/2;
+  if(cy<rc.top+edge) v=-Math.ceil((rc.top+edge-cy)/6);
+  else if(cy>rc.bottom-110) v=Math.ceil((cy-(rc.bottom-110))/6);
+  if(v){board.scrollTop+=v;updateTarget()}
+  requestAnimationFrame(autoScroll);
+}
+
+board.addEventListener('pointerdown',e=>{
+  const el=e.target.closest('.block');if(!el||drag||pend)return;
+  pend={id:+el.dataset.id,el,x0:e.clientX,y0:e.clientY,x:e.clientX,y:e.clientY,mouse:e.pointerType==='mouse'};
+  pend.timer=setTimeout(()=>{if(pend)startDrag()},200);
+});
+window.addEventListener('pointermove',e=>{
+  if(drag){drag.x=e.clientX;drag.y=e.clientY;moveGhost();updateTarget();return}
+  if(!pend)return;
+  pend.x=e.clientX;pend.y=e.clientY;
+  const dx=pend.x-pend.x0, dy=pend.y-pend.y0;
+  if(Math.hypot(dx,dy)>8){
+    if(pend.mouse||Math.abs(dx)>Math.abs(dy)) startDrag();       // sideways swipe → drag right away
+    else {clearTimeout(pend.timer);pend=null}                      // vertical → let the page scroll
+  }
+});
+function endPointer(e,cancel){
+  if(drag){drop();return}
+  if(pend){
+    clearTimeout(pend.timer);
+    const moved=Math.hypot(pend.x-pend.x0,pend.y-pend.y0);
+    const id=pend.id;pend=null;
+    if(!cancel&&moved<8) openSheet(id);
+  }
+}
+window.addEventListener('pointerup',e=>endPointer(e,false));
+window.addEventListener('pointercancel',e=>endPointer(e,true));
+document.addEventListener('touchmove',e=>{if(drag)e.preventDefault()},{passive:false});
+document.addEventListener('contextmenu',e=>{if(e.target.closest('.block'))e.preventDefault()});
+
+/* ---------- add / edit sheet ---------- */
+const sheetBg=document.getElementById('sheetBg'), input=document.getElementById('sheetInput');
+const delBtn=document.getElementById('delBtn');let editing=null;
+function openSheet(id){
+  editing=id||null;
+  const pos=id?findBlock(id):null;
+  document.getElementById('sheetTitle').textContent=id?'블록 수정':'새 블록';
+  input.value=pos?lines[pos.r][pos.i].text:'';
+  delBtn.style.display=id?'':'none';
+  sheetBg.classList.add('on');setTimeout(()=>input.focus(),50);
+}
+function closeSheet(){sheetBg.classList.remove('on');input.blur();editing=null}
+document.getElementById('add').addEventListener('click',()=>openSheet(null));
+document.getElementById('cancelBtn').addEventListener('click',closeSheet);
+sheetBg.addEventListener('click',e=>{if(e.target===sheetBg)closeSheet()});
+delBtn.addEventListener('click',()=>{
+  const pos=findBlock(editing);
+  if(pos){lines[pos.r].splice(pos.i,1);lines=lines.filter(l=>l.length);save();render()}
+  closeSheet();
+});
+document.getElementById('sheet').addEventListener('submit',e=>{
+  e.preventDefault();
+  const text=input.value.trim();if(!text){input.focus();return}
+  if(editing){const pos=findBlock(editing);if(pos)lines[pos.r][pos.i].text=text}
+  else {lines.push([mk(text)]);setTimeout(()=>board.scrollTo({top:board.scrollHeight,behavior:'smooth'}),30)}
+  save();closeSheet();render();
+});
+
+function showToast(){
+  const t=document.getElementById('toast');t.classList.add('on');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.classList.remove('on');undoSnap=null},4000);
+}
+document.getElementById('undoBtn').addEventListener('click',()=>{
+  if(!undoSnap)return;
+  lines=undoSnap.lines;seq=undoSnap.seq;undoSnap=null;save();render();
+  document.getElementById('toast').classList.remove('on');
+});
+
+load();render();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})});
+}
+</script>
+</body>
+</html>
